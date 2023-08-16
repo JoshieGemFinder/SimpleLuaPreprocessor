@@ -58,6 +58,17 @@ local byte_exclaimation <const> = 33 -- !
 local byte_backslash <const> = 92 -- \
 
 
+local const <const> = {string.byte("<const>", 1, -1)}
+local function isConstToken(arr, index)
+    for i=1,#const do
+        if arr[index + i - 1] ~= const[i] then
+            return false
+        end
+    end
+    return true
+end
+
+
 local function isAlpha(byte)
     return (byte_A <= byte and byte <= byte_Z)
         or (byte_a <= byte and byte <= byte_z)
@@ -129,7 +140,7 @@ local Tokens = {
     PERIOD = "period",
     DELIMITER = "delimiter",
     
-    GOTO_LABEL = "goto_label",
+    SPECIAL_KEYWORD = "special_keyword",
 
     COMMENT = "comment",
     MULTILINE_COMMENT = "comment_multiline",
@@ -380,6 +391,10 @@ function TokenProducer:ReadToken()
 
     --handle operators like + and ==
     if isOperatorSymbol(char) then
+        if isConstToken(self.currentLineBytes, index) then
+            self.linePos = index + 6 --mark the next 6 byte as read
+            return "<const>", Tokens.SPECIAL_KEYWORD
+        end
         if isOperatorSymbol(nextChar) then
             self.linePos = index + 1 --mark the next byte as read
             return string.char(char, nextChar), Tokens.OPERATOR

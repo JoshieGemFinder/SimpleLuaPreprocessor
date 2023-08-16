@@ -13,7 +13,7 @@ local function identifyWordTokenType(word)
         return CONSTANT
     end
 
-    if word == "break" or word == "do" or word == "else" or word == "elseif" or word == "end" or word == "for" or word == "function" or word == "goto" or word == "if" or word == "in" or word == "local" or word == "repeat" or word == "return" or word == "then" or word == "until" or word == "while" then
+    if word == "break" or word == "do" or word == "else" or word == "elseif" or word == "end" or word == "for" or word == "function" or word == "goto" or word == "if" or word == "in" or word == "local" or word == "repeat" or word == "return" or word == "then" or word == "until" or word == "while" or word == "<const>" then
         return KEYWORD
     end
 
@@ -49,7 +49,7 @@ local function formatToken(token, tokenType, currTkn, prevTkn)
             return token .. " "
         end
         return " " .. token .. " "
-    elseif tokenType == Tokens.WORD then
+    elseif tokenType == Tokens.WORD or tokenType == Tokens.SPECIAL_KEYWORD then
 
         local wordType = identifyWordTokenType(token)
 
