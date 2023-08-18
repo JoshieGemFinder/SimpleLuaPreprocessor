@@ -64,17 +64,17 @@ end
 local function table_insert(self, ...)
     local len <const> = select("#", ...)
     local k <const> = #self
-
+    local args = {...}
     for i=1,len do
-        self[k + i] = select(i, ...)
-        -- table.insert(self, select(i, ...))
+        -- self[k + i] = args[i]
+        table.insert(self, args[i])
     end
 
     return len
 end
 
 
-local function isConstant(tokenType)
+local function isConstant(token, tokenType)
 
     if tokenType == Tokens.WORD then
         local wordType <const> = identifyWordTokenType(token)
@@ -83,11 +83,11 @@ local function isConstant(tokenType)
     end
 
     return tokenType == Tokens.OPERATOR or tokenType == Tokens.STRING or tokenType == Tokens.STRING_MULTILINE
-        or tokenType == Tokens.NUMBER or tokenType == Tokens.BRACKET
+        or tokenType == Tokens.NUMBER or (tokenType == Tokens.BRACKET and (token == "(" or token == ")"))
 end
 
-local function isGroupConstant(group)
-    -- local prevType = nil
+local function isGroupConstant(group, modifier)
+    local macros <const> = modifier.macros
     for i=1,#group do
         local tkn <const> = group[i]
 
@@ -95,15 +95,51 @@ local function isGroupConstant(group)
 
 
         --TODO: Proper Parsing for e.g brackets
-        if not isConstant(tokenType) then
-            return false
+        if not isConstant(token, tokenType) then
+            local macro <const> = macros[token]
+            if macro ~= nil then
+                local const = isGroupConstant(modifier:GetContentTokens(macro), modifier)
+                return const
+            else
+                return false
+            end
         end
     end
     return true
 end
 
+local function evalTokens(tokens)
+    -- print("Eval: ", Reconstruct(tokens))
+    local eval = table.pack(pcall(load("return " .. Reconstruct(tokens))))
+    local success = eval[1]
+
+    if not success then --error in eval
+        return tokens
+    end
+
+    local outTokens = {}
+    for i=2,eval.n do
+        local token = eval[i]
+        local tokenType = Tokens.RAW
+
+        local _type <const> = type(token)
+        if _type == 'number' then
+            tokenType = Tokens.NUMBER
+        elseif _type == 'string' then
+            token = reparseString(token)
+            tokenType = Tokens.STRING
+        elseif _type == 'table' then -- can't return tables, try unpacking them!
+            return tokens
+        end
+
+        table.insert(outTokens, {token, tokenType})
+    end
+
+    return outTokens
+end
+
 local Modifier = {}
-Modifier.metatable = {__index = Modifier, __metatable = nil}
+Modifier.metatable = {__index = Modifier, __metatable = function() return nil end}
 
 
 function Modifier.new(producer, output, switches)
@@ -153,10 +189,8 @@ function Modifier:GetContentTokens(macro)
     
     local type <const> = macro.type
 
-    if type == ID_DEFINE then
+    if type == ID_DEFINE or type == ID_RAW then
         return table.unpack(macro.content)
-    elseif type == ID_RAW then
-        return {macro.content, Tokens.RAW}
     elseif type == ID_EVAL or type == ID_FUNC then
         return table.unpack(self:HandleEval(macro))
     end
@@ -178,14 +212,13 @@ function Modifier:ReadUntilToken(end_token)
             return tokens, n
         end
 
-        if self.macros[token] == nil then
+        local macro <const> = self.macros[token]
+        if macro == nil then
             n = n + 1
             tokens[n] = {token, tokenType}
         else
-            -- print("ReadUntilToken encountered macro!!")
-            local c = table_insert(tokens, self:GetModifiedTokens(token, tokenType))
+            local c = table_insert(tokens, self:GetContentTokens(macro))
             n = n + c
-            -- print(c, tokens[n + c])
         end
     end
 
@@ -271,14 +304,14 @@ function Modifier:ReadBrackets(strict) -- strict: brackets can only be on one li
             if tokenType ~= Tokens.LINEFEED then
                 
                 --basic group stuff
-                if bracketIndent == 1 then
+                -- if bracketIndent == 1 then
                     if squareIndex <= 0 and tokenType == Tokens.DELIMITER then
                         table.insert(groups, currentGroup)
                         currentGroup = {}
                     else
                         table.insert(currentGroup, tkn)
                     end
-                end
+                -- end
     
                 n = n + 1
                 tokens[n] = tkn
@@ -317,8 +350,13 @@ function Modifier:CreateFuncMacro(id)
     --     print(tostring(i) .. "\t" .. table.concat(out, " "))
     -- end
 
-
+    -- print("----------")
     local tokens = self:ReadUntilToken(Tokens.LINEFEED)
+    -- for _, tkn in ipairs(tokens) do
+    --     print(_, tkn[1], tkn[2])
+    -- end
+    -- print("----------")
+
     self.macros[trigger_token] = {type=id, args=groups, content=tokens}
 
     -- print("Eval END")
@@ -336,10 +374,32 @@ function Modifier:ParseToken()
         if token == DEFINE then
             local trigger_token = producer:ReadToken()
 
-            local tokens = self:ReadUntilToken(Tokens.LINEFEED)
+            local tokens, n = self:ReadUntilToken(Tokens.LINEFEED)
+            if n > 1 and tokens[1][1] == "(" and tokens[n][1] == ")" and isGroupConstant(tokens, self) then -- if the group is evaluable, eval
+                -- for i=1,n do
+                --     local tkn <const> = tokens[i]
+                --     local _token, _tokenType <const> = tkn[1], tkn[2]
+                --     if _tokenType == Tokens.OPERATOR or _tokenType == Tokens or (_tokenType == Tokens.WORD and identifyWordTokenType(_token) == Tokens.OPERATOR) then
+                --         tokens = evalTokens(tokens)
+                --         break
+                --     end
+                -- end
+                tokens = evalTokens(tokens)
+                n = #tokens
+            end
+
+            -- --seperate checks because you might the number of tokens can be adjusted by the eval
+            -- if n > 1 and tokens[1][1] ~= "(" and tokens[n][1] ~= ")" and isGroupConstant(tokens, self) then
+            --     local contentTokens = {{"(", Tokens.BRACKET}}
+            --     for _, tkn in ipairs(tokens) do
+            --         table.insert(contentTokens, tkn)
+            --     end
+            --     table.insert(contentTokens, {")", Tokens.BRACKET})
+            --     tokens = contentTokens
+            -- end
+
             self.macros[trigger_token] = {type=ID_DEFINE, content=tokens}
             return false
-
         elseif token == EVAL then
             self:CreateFuncMacro(ID_EVAL)
             return false
@@ -349,7 +409,9 @@ function Modifier:ParseToken()
         elseif token == RAW_DEFINE then
             local trigger_token = producer:ReadToken()
 
-            self.macros[trigger_token] = {type=ID_RAW, content=(producer:ReadLine()):match("^%s*(.-)%s*$")}
+            local tokens = self:ReadUntilToken(Tokens.LINEFEED)
+            self.macros[trigger_token] = {type=ID_RAW, content=tokens}
+            -- self.macros[trigger_token] = {type=ID_RAW, content=(producer:ReadLine()):match("^%s*(.-)%s*$")}
             return false
         elseif token == COMMENT then
             producer:ReadLine()
@@ -404,7 +466,7 @@ function Modifier:HandleEval(macro)
     
     local can_eval = macro.type == ID_EVAL --don't attempt to eval if only @func was defined
     for i, group in ipairs(groups) do
-        if not isGroupConstant(group) then
+        if not isGroupConstant(group, self) then
             can_eval = false
             break
         end
@@ -415,11 +477,17 @@ function Modifier:HandleEval(macro)
     for _, tkn in ipairs(input) do
         local group_index <const> = group_indexes[tkn[1]]
         if group_index ~= nil then
-            table.insert(output, {"(", Tokens.BRACKET})
+            local prevToken <const> = input[_-1]
+            local nextToken <const> = input[_+1]
+            local hasBrackets <const> = prevToken ~= nil and nextToken ~= nil and prevToken[1] == "(" and nextToken[1] == ")"
+
+            if not hasBrackets then table.insert(output, {"(", Tokens.BRACKET}) end
+            
             for _, v in ipairs(groups[group_index]) do
                 table.insert(output, v)
             end
-            table.insert(output, {")", Tokens.BRACKET})
+            
+            if not hasBrackets then table.insert(output, {")", Tokens.BRACKET}) end
         else
             table.insert(output, tkn)
         end
@@ -431,33 +499,7 @@ function Modifier:HandleEval(macro)
 
 
     if can_eval then
-        local outTokens = {}
-
-        -- print("Eval: ", Reconstruct(output))
-        local eval = table.pack(pcall(load("return " .. Reconstruct(output))))
-        local success = eval[1]
-
-        if success then
-            for i=2,eval.n do
-                local token = eval[i]
-                local tokenType = Tokens.RAW
-
-                local _type <const> = type(token)
-                if _type == 'number' then
-                    tokenType = Tokens.NUMBER
-                elseif _type == 'string' then
-                    token = reparseString(token)
-                    tokenType = Tokens.STRING
-                end
-                table.insert(outTokens, {token, tokenType})
-            end
-        else --error in @eval, fall back to @func behaviour
-            for _, tkn in ipairs(output) do
-                table.insert(outTokens, tkn)
-            end
-        end
-
-        return outTokens
+        return evalTokens(output)
     end
 
     -- print("END")

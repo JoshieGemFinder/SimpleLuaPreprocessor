@@ -33,8 +33,9 @@ end
 
 function Stream:WriteAll(...)
     local n = select("#", ...)
+    local args = {...}
     for i=1,n do
-        self:Write(select(i, ...))
+        self:Write(args[i])
     end
     return n > 0
 end
@@ -53,13 +54,11 @@ end
 
 function Stream:UnshiftAll(...)
     local n = select("#", ...)
+    local args = {...}
     for i=n,1,-1 do
-        self:Unshift(select(i, ...))
+        self:Unshift(args[i])
     end
-    -- local n = select("#", ...)
-    -- for i=1,n,1 do
-    --     self:Unshift(select(i, ...))
-    -- end
+    return n > 0
 end
 
 function Stream:_read()
@@ -105,5 +104,30 @@ end
 function Stream:Remaining()
     return self.un + (self.n - self.pos)
 end
+
+
+--gets the next piece of data without consuming it
+function Stream:_next()
+    --handle any unshifted data
+    local un <const> = self.un
+    if un > 0 then
+        local data = self.udata[un]
+        self.udata[un] = nil
+        return data
+    end
+
+    --handle normal data
+    local pos = self.pos + 1
+    if pos > self.n then
+        return nil
+    end
+
+    return self.data[pos]
+end
+
+function Stream:Next()
+    return self:_next()
+end
+
 
 return Stream
