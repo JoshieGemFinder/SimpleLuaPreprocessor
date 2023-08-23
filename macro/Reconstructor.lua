@@ -24,11 +24,11 @@ local BRACKET_OPENING <const> = "opening"
 local BRACKET_CLOSING <const> = "closing"
 
 local function identifyBracketType(bracket)
-    if word == "{" or word == "(" or word == "[" then
+    if bracket == "{" or bracket == "(" or bracket == "[" then
         return BRACKET_OPENING
     end
 
-    if word == "}" or word == ")" or word == "]" then
+    if bracket == "}" or bracket == ")" or bracket == "]" then
         return BRACKET_CLOSING
     end
 
@@ -55,8 +55,20 @@ local function formatToken(token, tokenType, currTkn, prevTkn)
 
         if wordType == Tokens.OPERATOR then
             currTkn[2] = Tokens.OPERATOR
-            if prevTkn ~= nil and prevTkn[2] == Tokens.OPERATOR then
+            if prevTkn ~= nil and (prevTkn[2] == Tokens.OPERATOR or prevTkn[2] == KEYWORD) then
                 return token .. " "
+            end
+            return " " .. token .. " "
+        end
+        
+        if wordType == KEYWORD then
+            currTkn[2] = KEYWORD
+            if prevTkn ~= nil then
+                local prevToken <const> = prevTkn[1]
+                local prevTokenType <const> = prevTkn[2]
+                if prevTokenType == Tokens.OPERATOR or prevTokenType == KEYWORD or prevTokenType == Tokens.LINEFEED or (prevTokenType == Tokens.BRACKET and identifyBracketType(prevToken) == BRACKET_OPENING) then
+                    return token .. " "
+                end
             end
             return " " .. token .. " "
         end
@@ -65,11 +77,10 @@ local function formatToken(token, tokenType, currTkn, prevTkn)
             local prevToken <const> = prevTkn[1]
             local prevTokenType <const> = prevTkn[2]
 
-            if prevTokenType == Tokens.WORD then
-                return " " .. token
-            elseif prevTokenType == Tokens.BRACKET and identifyBracketType(prevToken) == BRACKET_CLOSING then
-                return " " .. token
+            if prevTokenType == Tokens.OPERATOR or prevTokenType == KEYWORD or prevTokenType == Tokens.PERIOD or prevTokenType == Tokens.DELIMITER or prevTokenType == Tokens.LINEFEED or (prevTokenType == Tokens.BRACKET and identifyBracketType(prevToken) == BRACKET_OPENING) then
+                return token
             end
+            return " " .. token
         end
     elseif tokenType == Tokens.DELIMITER then
         return token .. " "

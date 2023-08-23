@@ -9,6 +9,10 @@ local byte_9 <const> = 57
 local byte_at <const> = 64
 local byte_underscore <const> = 95
 
+
+local byte_X <const> = 88
+local byte_x <const> = 120
+
 local pattern_alphanum = "[A-Za-z0-9_]+"
 
 --string.byte("\r\n \t", 1, -1)
@@ -302,7 +306,21 @@ function TokenProducer:ReadToken()
 
     --handle numbers
     if isNum(char) then
-        local _i, _j = string.find(line, "%d+", index)
+        local f = false
+        local _i, _j;
+        if char == byte_0 then
+            local nextChar = self.currentLineBytes[index + 1]
+            if nextChar == byte_x or nextChar == byte_X then
+                -- no periods in hex numbers
+                _i, _j = string.find(line, "%dx[0-9a-fA-F]*", index)
+                f = true
+            end
+        end
+
+        if f == false then
+            _i, _j = string.find(line, "%d[0-9.]*", index)
+        end
+        
         self.linePos = _j
         return string.sub(line, _i, _j), Tokens.NUMBER
     end
