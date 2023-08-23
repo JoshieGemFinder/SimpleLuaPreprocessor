@@ -28,11 +28,15 @@ print(table1!customKey) -- print(table1[1])
 Macros are indicated by the `@` character. They will almost always consume the rest of the current line, so they cannot be used inline, and are recommended to be placed at the start of lines.
 **A macro name cannot be composed of more than one token**
 
-* `@def` (Usage: `@def <name> <replacement>`). Simply replaces any further occurrences of `<name>` with the `<replacement>` tokens. `<replacement>` can be multiple tokens.
-* `@raw` (Usage: `@raw <name> <replacement>`). Same behaviour as `@def`, but will not attempt to evaluate simple maths or encapsulate in brackets.
-* `@eval` (Usage: `@eval <name>(<args>) <statement>`). Tries to evaluate further occurrences of `<name>` as a function with `<statement>` at compile time, will not evaluate if the arguments passed are not all constants or operators.
-* `@func` (Usage: `@func <name>(<args>) <substitution>`). The same as `@eval`, but skips the evaluation step.
+* `@def` (Usage: `@def <name> <...replacement>`). Simply replaces any further occurrences of `<name>` with the `<replacement>` tokens. `<replacement>` can be multiple tokens.
+* `@raw` (Usage: `@raw <name> <...replacement>`). Same behaviour as `@def`, but will not attempt to evaluate simple maths or encapsulate in brackets.
+* `@eval` (Usage: `@eval <name>(<args>) <...statement>`). Tries to evaluate further occurrences of `<name>` as a function with `<statement>` at compile time, will not evaluate if the arguments passed are not all constants or operators.
+* `@func` (Usage: `@func <name>(<args>) <...substitution>`). The same as `@eval`, but skips the evaluation step.
 * `@comment` (Usage: `@comment`). Removes itself and the rest of the line from the output.
+
+Some more complex macros are:  
+* `@del` (Usage: `@del <name1> [name2] [name3] [...names]`). Deletes any macros with the specified names.
+* `@enum` (Usage: `@enum [start] [increment]; <name1>, [name2], [name3], ...`). Will `@def` all of the `<name>` tokens with the values `[start]` (default: `1`) incrementing by `[increment]` (default: `1`).
 
 Macros can also other macros in their definitions (but only if that macro was defined earlier!)
 
@@ -113,3 +117,42 @@ print(add(1, 2)) -- is print((1) + (2)) in the output file
 --This comment will though
 ```
 
+### `@del`
+
+```lua
+
+@def HELLO "Hello World!"
+
+-- print("Hello World!") in the output
+print(HELLO)
+
+-- delete the HELLO macro
+@del HELLO
+
+-- print(HELLO) in the output
+print(HELLO)
+```
+
+### `@enum`
+
+```lua
+
+--start and increment default to 1 here
+@enum A B C D E F
+
+--print(1, 2, 3, 4, 5 ,6)
+print(A, B, C, D, E F)
+
+--the semicolon is not strictly necessary here, but it makes good readability
+@enum 0; G H I
+
+--print(0, 1, 2)
+print(G, H, I)
+
+--start at index 10, increment by 4
+@enum 10, 4; J, K, L, M, N, O, P
+
+--print(10, 14, 18, 22, 26, 30, 34)
+print(J, K, L, M, N, O, P)
+
+```

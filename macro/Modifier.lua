@@ -13,7 +13,11 @@ local EVAL <const> = "@eval"
 local FUNC <const> = "@func"
 local RAW_DEFINE <const> = "@raw"
 
+local ENUM <const> = "@enum"
+
 local COMMENT <const> = "@comment"
+
+local DELETE <const> = "@del"
 
 local constant_token <const> = "constant"
 
@@ -84,6 +88,7 @@ local function isConstant(token, tokenType)
 
     return tokenType == Tokens.OPERATOR or tokenType == Tokens.STRING or tokenType == Tokens.STRING_MULTILINE
         or tokenType == Tokens.NUMBER or (tokenType == Tokens.BRACKET and (token == "(" or token == ")"))
+        or tokenType == Tokens.LINEFEED
 end
 
 local function isGroupConstant(group, modifier)
@@ -200,7 +205,9 @@ function Modifier:GetContentTokens(macro)
 end
 
 --reads tokens until the next occurance of end_token (the end_token is not returned)
-function Modifier:ReadUntilToken(end_token)
+function Modifier:ReadUntilToken(end_token, bypass_macros, allow_escaping)
+    if bypass_macros ~= true then bypass_macros = false end
+    if allow_escaping ~= true then allow_escaping = false end
     local tokens <const> = {}
     local n = 0
 
@@ -209,11 +216,16 @@ function Modifier:ReadUntilToken(end_token)
         local token, tokenType = producer:ReadToken()
 
         if token == end_token then
-            return tokens, n
+            if allow_escaping and tokens[n][1] == [[\]] then
+                tokens[n] = nil
+                n = n - 1
+            else
+                return tokens, n
+            end
         end
 
         local macro <const> = self.macros[token]
-        if macro == nil then
+        if bypass_macros or macro == nil then
             n = n + 1
             tokens[n] = {token, tokenType}
         else
@@ -374,7 +386,7 @@ function Modifier:ParseToken()
         if token == DEFINE then
             local trigger_token = producer:ReadToken()
 
-            local tokens, n = self:ReadUntilToken(Tokens.LINEFEED)
+            local tokens, n = self:ReadUntilToken(Tokens.LINEFEED, false, true)
             if n > 1 and tokens[1][1] == "(" and tokens[n][1] == ")" and isGroupConstant(tokens, self) then -- if the group is evaluable, eval
                 -- for i=1,n do
                 --     local tkn <const> = tokens[i]
@@ -409,13 +421,62 @@ function Modifier:ParseToken()
         elseif token == RAW_DEFINE then
             local trigger_token = producer:ReadToken()
 
-            local tokens = self:ReadUntilToken(Tokens.LINEFEED)
+            local tokens = self:ReadUntilToken(Tokens.LINEFEED, false, true)
             self.macros[trigger_token] = {type=ID_RAW, content=tokens}
             -- self.macros[trigger_token] = {type=ID_RAW, content=(producer:ReadLine()):match("^%s*(.-)%s*$")}
+            return false
+        elseif token == ENUM then
+            local tokens, n = self:ReadUntilToken(Tokens.LINEFEED, false, true)
+
+            local enumStart = 1
+            local enumIncrement = 1
+
+            local startIndex = 1
+            
+            do
+                local found = 0
+                --look for [start] and [increment]
+                for i=1,n do
+                    local _token, _tokenType <const> = tokens[i][1], tokens[i][2]
+                    if _token == ";" then
+                        -- break early if there's a ;
+                        break
+                    end
+
+                    if _tokenType == Tokens.NUMBER then
+                        startIndex = i + 1
+                        found = found + 1
+                        
+                        if found == 1 then
+                            enumStart = tonumber(_token)
+                        elseif found == 2 then
+                            enumIncrement = tonumber(_token)
+                            break
+                        end
+                    end
+                end
+            end
+
+            local enumVal = enumStart
+            for i=startIndex,n do
+                local enumToken, enumTokenType <const> = tokens[i][1], tokens[i][2]
+                if not (enumTokenType == Tokens.DELIMITER or enumTokenType == Tokens.LINEFEED) then
+                    self.macros[enumToken] = {type=ID_DEFINE, content={{tostring(enumVal), Tokens.NUMBER}}}
+                    enumVal = enumVal + enumIncrement
+                end
+            end
+
             return false
         elseif token == COMMENT then
             producer:ReadLine()
             producer:ReadToken()
+            return false
+        elseif token == DELETE then
+            local tokens, n = self:ReadUntilToken(Tokens.LINEFEED, true, true)
+
+            for i=1,n do
+                self.macros[tokens[i][1]] = nil
+            end
             return false
         end
 

@@ -2,11 +2,11 @@
 do
     local ver = _G._VERSION:match("Lua (%d+%.%d+)")
     if ver ~= "5.4" then
-        print("\27[33mWarning! This script was designed to run on Lua 5.4. You may experience bugs or errors.\27[0m")
+        print("\27[33mWarning! This script was designed to run on Lua 5.4 and parse Lua 5.4 files. You may experience bugs or errors.\27[0m")
     end
 end
 
-_G._PREPROCESSOR_VERSION = "1.1.1"
+_G._PREPROCESSOR_VERSION = "1.2.0"
 
 --wacky OS compatibility
 do
