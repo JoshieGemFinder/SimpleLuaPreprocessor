@@ -276,8 +276,11 @@ function TokenProducer:ReadLinefeed()
     if self:NextLine() then
         return Tokens.LINEFEED, Tokens.LINEFEED
     else
-        self:Close()
-        return Tokens.EOF, Tokens.EOF
+        -- we need to always return a buffer linefeed at the end
+        self.currentLine = nil
+        return Tokens.LINEFEED, Tokens.LINEFEED
+        -- self:Close()
+        -- return Tokens.EOF, Tokens.EOF
     end
 end
 
@@ -366,6 +369,14 @@ function TokenProducer:ReadToken()
     end
 
     local nextChar = self.currentLineBytes[index + 1]
+
+    --handle ->special
+    if char == byte_minus and nextChar == byte_gt then
+        local _, _j = string.find(line, pattern_alphanum, index + 1)
+        self.linePos = _j
+
+        return string.sub(line, index, _j), Tokens.SPECIAL
+    end
 
     --handle concat
     if char == byte_period then -- .

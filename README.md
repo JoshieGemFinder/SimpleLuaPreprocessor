@@ -11,7 +11,7 @@ For example, `print("Hello, World!")` would be split into the tokens `print`, `(
 
 There are two unique types of tokens that this program can use, but are not part of base lua.  
 * `@<macro>` tokens. Prefixed with an `@`, these are used to define macros.
-* `!<special>` tokens. Prefixed with `!`, these can be used as macro names in places where spaces may not be appropriate.
+* `!<special>`/`->special` tokens. Prefixed with `!` or a `->`, these can be used as macro names in places where spaces may not be appropriate.
 
 ```lua
 @def !customKey [1]

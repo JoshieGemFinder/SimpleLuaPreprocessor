@@ -6,7 +6,7 @@ do
     end
 end
 
-_G._PREPROCESSOR_VERSION = "1.2.0"
+_G._PREPROCESSOR_VERSION = "1.2.1"
 
 --wacky OS compatibility
 do
