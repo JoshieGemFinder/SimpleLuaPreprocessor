@@ -15,12 +15,14 @@ There are two unique types of tokens that this program can use, but are not part
 
 ```lua
 @def !customKey [1]
+@def ->customKey [1]
 
 local table1 = {
     !customKey = 4  -- [1] = 4
 }
 
 print(table1!customKey) -- print(table1[1])
+print(table1->customKey) -- print(table1[1])
 ```
 
 ## Macro Rules
