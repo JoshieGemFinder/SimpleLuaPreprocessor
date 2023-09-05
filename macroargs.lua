@@ -2,6 +2,7 @@
 local switches = {
     -- l = false,
     -- p = false,
+    m = false,
     s = false,
     ["?"] = false
 }
@@ -11,15 +12,19 @@ local function printInfo()
     print("Simple Lua Preprocessor v" .. _G._PREPROCESSOR_VERSION)
     print("Usage: luam [options] input_file [output_file]")
     print("Available options:")
-    -- print("\t-p:\tPrint tokens, do not reconstruct.")
-    print("\t-s:\tStrip comments.")
-    print("\t-?:\tShow this help menu.")
+    print("\t-o files\tSearch all ;-delimited files for macros.")
+    -- print("\t-p:\t\tPrint tokens, do not reconstruct.")
+    print("\t-s\t\tStrip comments.")
+    print("\t-?\t\tShow this help menu.")
     print()
-    print("\tinput_file:\tPath to the file that will be parsed")
-    print("\toutput_file:\tPath to write the compiled file to\n\t\t\t  (if omitted, will default to \"<input_file>-compiled.lua\")")
+    print("\tinput_file\tPath to the file that will be parsed")
+    print("\toutput_file\tPath to write the compiled file to.\n\t\t\t  Default: \"<input_file>-compiled.lua\"")
 
     os.exit()
 end
+
+local input_file, output_file;
+local i = 0
 
 local function handleSwitch(switch)
     if switches[switch] == nil then
@@ -30,14 +35,28 @@ local function handleSwitch(switch)
     if switch == "?" then
         printInfo()
     end
+
+    if switch == "m" then
+        i = i + 1
+        local files = arg[i]
+        local iterator = string.gmatch(files, "[^" .. _G.PATH_DELIMITER .. "]+")
+        local m = {}
+        for file in iterator do
+            table.insert(m, file)
+        end
+        switches[switch] = m
+
+        return
+    end
+
     -- if switch == "l" then
 
     -- end
 end
 
-local input_file, output_file;
+while i < #arg do
+    i = i + 1
 
-for i=1,#arg do
     local argument = arg[i]
 
     if #argument == 2 then

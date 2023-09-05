@@ -179,6 +179,32 @@ function Modifier.new(producer, output, switches)
     return modifier
 end
 
+function Modifier.newScraper(producer)
+    local modifier = {}
+
+    modifier.producer = producer
+    modifier.input = Stream.new({
+        producer = producer,
+        Read = function(self)
+            if self:Remaining() <= 0 then
+                -- local n <const> = self.n + 1
+                -- self.n = n
+                -- self.pos = n
+                -- return {self.producer:ReadToken()}
+                self:Write({self.producer:ReadToken()})
+            end
+            return self:_read()
+        end
+    })
+    modifier.state = 1
+
+    ---Macros in the form {Triggering Token = {type = "replacement/raw/function", content = <content to replace the triggering token with>}}
+    modifier.macros = {}
+    
+    setmetatable(modifier, Modifier.metatable)
+    return modifier
+end
+
 function Modifier:GetModifiedTokens(token)
     
     local macro <const> = self.macros[token]
@@ -482,7 +508,7 @@ function Modifier:ParseToken()
 
         error("Unknown macro " .. token .. "!")
         return false;
-    else
+    elseif self.state == 0 then
         local macro <const> = self.macros[token]
 
         if macro == nil then
@@ -496,6 +522,7 @@ function Modifier:ParseToken()
         
         return stream:WriteAll(self:GetContentTokens(macro))
     end
+    return false
 end
 
 function Modifier:HandleEval(macro)
